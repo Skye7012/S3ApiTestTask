@@ -9,4 +9,9 @@ public class GenereateUploadLinkResponse
 	/// Ссылка на загрузку файла
 	/// </summary>
 	public string UploadLink { get; set; } = default!;
+
+	/// <summary>
+	/// Идентификатор файла
+	/// </summary>
+	public Guid FileId { get; set; }
 }

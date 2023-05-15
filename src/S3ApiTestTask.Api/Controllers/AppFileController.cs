@@ -1,12 +1,10 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using S3ApiTestTask.Application.Files.Commands.GenereateUploadLink;
-using S3ApiTestTask.Application.Files.Commands.UploadFile;
 using S3ApiTestTask.Application.Files.Queries.DownloadFile;
 using S3ApiTestTask.Application.Files.Queries.GetFiles;
 using S3ApiTestTask.Contracts.Requests.Files.GenereateUploadLink;
 using S3ApiTestTask.Contracts.Requests.Files.GetFiles;
-using S3ApiTestTask.Contracts.Requests.Files.UploadFile;
 
 namespace S3ApiTestTask.Api.Controllers;
 
@@ -29,47 +27,20 @@ public class AppFileController : ControllerBase
 	/// <summary>
 	/// Сгенерировать ссылку на загрузку файла
 	/// </summary>
+	/// <param name="request">Запрос</param>
 	/// <param name="cancellationToken">Токен отмены</param>
 	/// <returns>Ссылка на загрузку файла</returns>
 	[HttpPost("GenereateUploadLink")]
 	[ProducesResponseType(StatusCodes.Status200OK)]
 	public async Task<GenereateUploadLinkResponse> GenereateUploadLinkAsync(
+		GenereateUploadLinkRequest request,
 		CancellationToken cancellationToken = default)
 			=> await _mediator.Send(
-				new GenereateUploadLinkCommand(),
+				new GenereateUploadLinkCommand
+				{
+					FileName = request.FileName,
+				},
 				cancellationToken);
-
-	/// <summary>
-	/// Загрузить файл
-	/// </summary>
-	/// <param name="id">Идентификатор ссылки загрузки файла</param>
-	/// <param name="file">Файл</param>
-	/// <param name="cancellationToken">Токен отмены</param>
-	/// <returns>Идентификатор файла</returns>
-	[HttpPost("Upload/{id}")]
-	[ProducesResponseType(StatusCodes.Status201Created)]
-	[ProducesResponseType(StatusCodes.Status400BadRequest)]
-	public async Task<UploadFileResponse> UploadAsync(
-		[FromRoute] Guid id,
-		IFormFile file,
-		CancellationToken cancellationToken)
-			=> await _mediator.Send(
-				new UploadFileCommand(id, file),
-				cancellationToken);
-
-	/// <summary>
-	/// Скачать файл
-	/// </summary>
-	/// <param name="id">Идентификатор файла</param>
-	/// <param name="cancellationToken">Токен отмены</param>
-	/// <returns>Файл</returns>
-	[HttpGet("Download/{id}")]
-	[ProducesResponseType(StatusCodes.Status200OK)]
-	[ProducesResponseType(StatusCodes.Status404NotFound)]
-	public async Task<FileStreamResult> DownloadAsync(
-		[FromRoute] Guid id,
-		CancellationToken cancellationToken)
-			=> await _mediator.Send(new DownloadFileQuery(id), cancellationToken);
 
 	/// <summary>
 	/// Получить список загруженных файлов
@@ -80,4 +51,23 @@ public class AppFileController : ControllerBase
 	[ProducesResponseType(StatusCodes.Status200OK)]
 	public async Task<GetFilesResponse> GetAsync(CancellationToken cancellationToken)
 			=> await _mediator.Send(new GetFilesQuery(), cancellationToken);
+
+	/// <summary>
+	/// Скачать файл
+	/// </summary>
+	/// <param name="id">Идентификатор файла</param>
+	/// <param name="cancellationToken">Токен отмены</param>
+	/// <returns>Файл</returns>
+	[HttpGet("Download/{id}")]
+	[ProducesResponseType(StatusCodes.Status200OK)]
+	[ProducesResponseType(StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(StatusCodes.Status404NotFound)]
+	public async Task<IActionResult> DownloadAsync(
+		[FromRoute] Guid id,
+		CancellationToken cancellationToken)
+	{
+		var response = await _mediator.Send(new DownloadFileQuery(id), cancellationToken);
+
+		return Redirect(response.DownloadLink);
+	}
 }

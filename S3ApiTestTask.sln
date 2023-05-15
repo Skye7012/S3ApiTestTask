@@ -24,6 +24,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "S3ApiTestTask.Infrastructur
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "S3ApiTestTask.Application", "src\S3ApiTestTask.Application\S3ApiTestTask.Application.csproj", "{12CFCD92-4A5D-478C-8E74-694759D68AEA}"
 EndProject
+Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{B4558FE3-C72A-4EA5-9BF9-C9CCBEE75A14}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -50,6 +52,10 @@ Global
 		{12CFCD92-4A5D-478C-8E74-694759D68AEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{12CFCD92-4A5D-478C-8E74-694759D68AEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{12CFCD92-4A5D-478C-8E74-694759D68AEA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4558FE3-C72A-4EA5-9BF9-C9CCBEE75A14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4558FE3-C72A-4EA5-9BF9-C9CCBEE75A14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4558FE3-C72A-4EA5-9BF9-C9CCBEE75A14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4558FE3-C72A-4EA5-9BF9-C9CCBEE75A14}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

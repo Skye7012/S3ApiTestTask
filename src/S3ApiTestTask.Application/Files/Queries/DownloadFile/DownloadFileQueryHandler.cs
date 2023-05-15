@@ -1,17 +1,17 @@
-using System.Net.Mime;
 using MediatR;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using S3ApiTestTask.Application.Common.Exceptions;
 using S3ApiTestTask.Application.Common.Services;
+using S3ApiTestTask.Contracts.Requests.Files.DownloadFile;
 using S3ApiTestTask.Domain.Entities;
+using S3ApiTestTask.Domain.Exceptions;
 
 namespace S3ApiTestTask.Application.Files.Queries.DownloadFile;
 
 /// <summary>
 /// Обработчик для of <see cref="DownloadFileQuery"/>
 /// </summary>
-public class DownloadFileQueryHandler : IRequestHandler<DownloadFileQuery, FileStreamResult>
+public class DownloadFileQueryHandler : IRequestHandler<DownloadFileQuery, DownloadFileResponse>
 {
 	private readonly IApplicationDbContext _context;
 	private readonly IS3Service _s3Service;
@@ -28,16 +28,29 @@ public class DownloadFileQueryHandler : IRequestHandler<DownloadFileQuery, FileS
 	}
 
 	/// <inheritdoc/>
-	public async Task<FileStreamResult> Handle(DownloadFileQuery request, CancellationToken cancellationToken)
+	public async Task<DownloadFileResponse> Handle(DownloadFileQuery request, CancellationToken cancellationToken)
 	{
-		var file = await _context.Files.FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken)
+		var file = await _context.Files
+			.FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken)
 			?? throw new EntityNotFoundProblem<AppFile>(request.Id);
 
-		var stream = await _s3Service.DownloadAsync(file.Name, cancellationToken);
+		if (file.DeletedOn != null)
+			throw new ValidationProblem("Файл был удален");
 
-		return new FileStreamResult(stream, MediaTypeNames.Application.Octet)
+		var isExists = await _s3Service.IsObjectExistsAsync(file.Name, cancellationToken);
+		if (!isExists)
 		{
-			FileDownloadName = file.Name,
+			if (!_s3Service.IsFileUploadingTimeExpired(file))
+				throw new ValidationProblem("Файл не был загружен");
+
+			_context.Files.Remove(file);
+			await _context.SaveChangesAsync(cancellationToken);
+			throw new ValidationProblem("Файл был удален, потому что не был загружен в хранилище");
+		}
+
+		return new DownloadFileResponse
+		{
+			DownloadLink = await _s3Service.PresignedGetObjectAsync(file.Name),
 		};
 	}
 }

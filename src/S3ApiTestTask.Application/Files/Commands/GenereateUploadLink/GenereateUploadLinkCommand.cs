@@ -6,6 +6,6 @@ namespace S3ApiTestTask.Application.Files.Commands.GenereateUploadLink;
 /// <summary>
 /// Команда на генерацию ссылки на загрузку файла
 /// </summary>
-public class GenereateUploadLinkCommand : IRequest<GenereateUploadLinkResponse>
+public class GenereateUploadLinkCommand : GenereateUploadLinkRequest, IRequest<GenereateUploadLinkResponse>
 {
 }

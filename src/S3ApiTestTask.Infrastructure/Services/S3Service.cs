@@ -1,6 +1,10 @@
+using System.Net.Mime;
+using Microsoft.Extensions.Options;
 using Minio;
+using Minio.AspNetCore;
+using S3ApiTestTask.Application.Common.Configs;
 using S3ApiTestTask.Application.Common.Services;
-using S3ApiTestTask.Domain.Exceptions;
+using S3ApiTestTask.Domain.Entities;
 
 namespace S3ApiTestTask.Infrastructure.Services;
 
@@ -9,74 +13,103 @@ namespace S3ApiTestTask.Infrastructure.Services;
 /// </summary>
 public class S3Service : IS3Service
 {
-	/// <summary>
-	/// Наименование бакета
-	/// </summary>
-	public const string BucketName = "files";
+	public const string MinioInternalClientName = "Internal";
+	public const string MinioExternalClientName = "External";
 
-	private readonly MinioClient _minioClient;
+	private readonly MinioClient _internalClient;
+	private readonly MinioClient _externalClient;
+	private readonly IDateTimeProvider _dateTimeProvider;
+	private readonly S3Config _config;
 
 	/// <summary>
 	/// Конструктор
 	/// </summary>
-	/// <param name="minioClient">Клиент minio</param>
-	public S3Service(MinioClient minioClient)
-		=> _minioClient = minioClient;
-
-	/// <inheritdoc/>
-	public async Task UploadAsync(
-		Stream data,
-		string fileName,
-		CancellationToken cancellationToken)
+	/// <param name="s3Config">Конфигурация S3</param>
+	/// <param name="dateTimeProvider">Провайдер даты и времени</param>
+	/// <param name="minioClientFactory">Фабрика minio клиентов</param>
+	public S3Service(
+		IOptions<S3Config> s3Config,
+		IDateTimeProvider dateTimeProvider,
+		IMinioClientFactory minioClientFactory)
 	{
-		await _minioClient.PutObjectAsync(
-			new PutObjectArgs()
-				.WithBucket(BucketName)
-				.WithObject(fileName)
-				.WithObjectSize(data.Length)
-				.WithStreamData(data),
-			cancellationToken);
+		_dateTimeProvider = dateTimeProvider;
+		_config = s3Config.Value;
+
+		_internalClient = minioClientFactory.CreateClient(MinioInternalClientName);
+		_externalClient = minioClientFactory.CreateClient(MinioExternalClientName);
 	}
 
 	/// <inheritdoc/>
-	public async Task<Stream> DownloadAsync(
-		string fileName,
-		CancellationToken cancellationToken)
+	public async Task<bool> IsObjectExistsAsync(string fileName, CancellationToken cancellationToken)
 	{
-		Stream data = new MemoryStream();
+		try
+		{
+			var args = new StatObjectArgs()
+				.WithBucket(_config.BucketName)
+				.WithObject(fileName);
 
-		await _minioClient.StatObjectAsync(
-			new StatObjectArgs()
-				.WithBucket(BucketName)
-				.WithObject(fileName),
-			cancellationToken);
+			await _internalClient.StatObjectAsync(args, cancellationToken);
 
-		await _minioClient.GetObjectAsync(
-			new GetObjectArgs()
-				.WithBucket(BucketName)
-				.WithObject(fileName)
-				.WithCallbackStream(res => res.CopyTo(data)),
-			cancellationToken);
-
-		if (data.Length == 0)
-			throw new ApplicationProblem("Не удалось скачать файл");
-
-		data.Position = 0;
-		return data;
+			return true;
+		}
+		catch
+		{
+			return false;
+		}
 	}
 
 	/// <inheritdoc/>
-	public async Task<bool> InitializeStorageAsync(CancellationToken cancellationToken)
+	public bool IsFileUploadingTimeExpired(AppFile file)
+		=> file.CreateOn.AddSeconds(_config.PresignedUrlLifetime) < _dateTimeProvider.UtcNow;
+
+	/// <inheritdoc/>
+	public async Task<string> PresignedPutObjectAsync(string fileName)
 	{
-		var isBucketCreated = await _minioClient.BucketExistsAsync(
+		var contentDisposition = new ContentDisposition
+		{
+			FileName = fileName,
+			Inline = false,
+		};
+
+		var args = new PresignedPutObjectArgs()
+			.WithBucket(_config.BucketName)
+			.WithObject(fileName)
+			.WithExpiry(_config.PresignedUrlLifetime)
+			.WithHeaders(new Dictionary<string, string>
+			{
+				["Content-Disposition"] = contentDisposition.ToString(),
+				["Content-Type"] = MediaTypeNames.Application.Octet,
+				["content-type"] = MediaTypeNames.Application.Octet,
+			});
+
+		return await _externalClient.PresignedPutObjectAsync(args);
+	}
+
+	/// <inheritdoc/>
+	public async Task<string> PresignedGetObjectAsync(string fileName)
+	{
+		var args = new PresignedGetObjectArgs()
+			.WithBucket(_config.BucketName)
+			.WithObject(fileName)
+			.WithExpiry(_config.PresignedUrlLifetime);
+
+		return await _externalClient.PresignedGetObjectAsync(args);
+	}
+
+	/// <inheritdoc/>
+	public async Task<bool> CreateBucketIfNotExist(
+		string bucketName,
+		CancellationToken cancellationToken)
+	{
+		var isBucketCreated = await _internalClient.BucketExistsAsync(
 			new BucketExistsArgs()
-				.WithBucket(BucketName),
+				.WithBucket(_config.BucketName),
 			cancellationToken);
 
 		if (!isBucketCreated)
-			await _minioClient.MakeBucketAsync(
+			await _internalClient.MakeBucketAsync(
 				new MakeBucketArgs()
-					.WithBucket(BucketName),
+					.WithBucket(_config.BucketName),
 				cancellationToken);
 
 		return isBucketCreated;

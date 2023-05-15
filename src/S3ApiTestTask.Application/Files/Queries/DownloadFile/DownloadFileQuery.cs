@@ -1,12 +1,12 @@
 using MediatR;
-using Microsoft.AspNetCore.Mvc;
+using S3ApiTestTask.Contracts.Requests.Files.DownloadFile;
 
 namespace S3ApiTestTask.Application.Files.Queries.DownloadFile;
 
 /// <summary>
 /// Запрос на скачивание файла 
 /// </summary>
-public class DownloadFileQuery : IRequest<FileStreamResult>
+public class DownloadFileQuery : IRequest<DownloadFileResponse>
 {
 	/// <summary>
 	/// Конструктор

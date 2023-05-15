@@ -6,12 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Minio.AspNetCore;
 using Npgsql;
 using S3ApiTestTask.Application.Common.Configs;
+using S3ApiTestTask.Application.Common.Extensions;
 using S3ApiTestTask.Application.Common.Services;
-using S3ApiTestTask.Application.Common.Services.CacheRepositories;
 using S3ApiTestTask.Infrastructure.InitExecutors;
 using S3ApiTestTask.Infrastructure.Persistence;
 using S3ApiTestTask.Infrastructure.Services;
-using S3ApiTestTask.Infrastructure.Services.CacheRepositories;
 
 namespace S3ApiTestTask.Infrastructure;
 
@@ -29,7 +28,6 @@ public static class InfrastructureServicesConfigurator
 		=> services
 			.AddDatabase(configuration)
 			.AddS3Storage(configuration)
-			.AddRedis(configuration)
 			.AddInitExecutors();
 
 	/// <summary>
@@ -65,25 +63,23 @@ public static class InfrastructureServicesConfigurator
 	/// <param name="configuration">Конфигурации приложения</param>
 	private static IServiceCollection AddS3Storage(this IServiceCollection services, IConfiguration configuration)
 	{
-		var connString = new Uri(configuration.GetConnectionString("S3")!);
-		services.AddMinio(connString);
+		var s3Config = services.ConfigureAndGet<S3Config>(configuration, S3Config.ConfigSectionName);
 
-		services.Configure<FilesConfig>(configuration.GetSection(FilesConfig.ConfigSectionName));
+		services.AddMinio(S3Service.MinioInternalClientName, x =>
+		{
+			x.Endpoint = s3Config.InternalUrl;
+			x.AccessKey = s3Config.AccessKey;
+			x.SecretKey = s3Config.SecterKey;
+		});
 
-		services.AddTransient<IS3Service, S3Service>();
+		services.AddMinio(S3Service.MinioExternalClientName, x =>
+		{
+			x.Endpoint = s3Config.ExternalUrl;
+			x.AccessKey = s3Config.AccessKey;
+			x.SecretKey = s3Config.SecterKey;
+		});
 
-		return services.AddTransient<IFileCacheRepository, FileCacheRepository>();
-	}
-
-	/// <summary>
-	/// Сконфигурировать Redis
-	/// </summary>
-	/// <param name="services">Сервисы</param>
-	/// <param name="configuration">Конфигурации приложения</param>
-	private static IServiceCollection AddRedis(this IServiceCollection services, IConfiguration configuration)
-	{
-		var connString = configuration.GetConnectionString("Redis")!;
-		return services.AddStackExchangeRedisCache(opt => opt.Configuration = connString);
+		return services.AddTransient<IS3Service, S3Service>();
 	}
 
 	/// <summary>
