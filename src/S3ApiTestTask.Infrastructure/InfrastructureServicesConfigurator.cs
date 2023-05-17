@@ -70,6 +70,7 @@ public static class InfrastructureServicesConfigurator
 			x.Endpoint = s3Config.InternalUrl;
 			x.AccessKey = s3Config.AccessKey;
 			x.SecretKey = s3Config.SecterKey;
+			x.Region = "eu-central-1";
 		});
 
 		services.AddMinio(S3Service.MinioExternalClientName, x =>
@@ -77,6 +78,7 @@ public static class InfrastructureServicesConfigurator
 			x.Endpoint = s3Config.ExternalUrl;
 			x.AccessKey = s3Config.AccessKey;
 			x.SecretKey = s3Config.SecterKey;
+			x.Region = "eu-central-1";
 		});
 
 		return services.AddTransient<IS3Service, S3Service>();
